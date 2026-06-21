@@ -62,7 +62,7 @@ class Config:
 
     # ---- Distributed cache (real Redis on a consistent-hash ring) ----
     redis_nodes: List[dict] = field(default_factory=_redis_nodes)
-    cache_vnodes: int = field(default_factory=lambda: _num("VNODES", 150))
+    cache_vnodes: int = field(default_factory=lambda: _num("VNODES", 600))
     cache_ttl_s: float = field(default_factory=lambda: _num("CACHE_TTL_S", 30.0))
 
     # ---- Batch writer ----

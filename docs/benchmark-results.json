@@ -1,0 +1,118 @@
+{
+  "base_url": "http://127.0.0.1:8000",
+  "latency_client": {
+    "requests": 4000,
+    "wall_s": 2.33,
+    "throughput_rps": 1715.9,
+    "client_p50_ms": 0.577,
+    "client_p95_ms": 0.632,
+    "client_p99_ms": 0.696,
+    "client_mean_ms": 0.582,
+    "steadystate_hit_rate": 1.0
+  },
+  "latency_server": {
+    "suggest_requests": 4848,
+    "window_samples": 4848,
+    "p50_ms": 0.123,
+    "p95_ms": 0.255,
+    "p99_ms": 0.285,
+    "max_ms": 3.703,
+    "mean_ms": 0.144
+  },
+  "cache": {
+    "nodes": [
+      {
+        "id": "redis1",
+        "host": "127.0.0.1",
+        "port": 6390
+      },
+      {
+        "id": "redis2",
+        "host": "127.0.0.1",
+        "port": 6391
+      },
+      {
+        "id": "redis3",
+        "host": "127.0.0.1",
+        "port": 6392
+      }
+    ],
+    "vnodes_per_node": 600,
+    "ttl_s": 30.0,
+    "hits": 4023,
+    "misses": 825,
+    "lookups": 4848,
+    "hit_rate": 0.8298,
+    "per_node": {
+      "redis1": {
+        "hits": 1678,
+        "misses": 258,
+        "sets": 258,
+        "errors": 0,
+        "hit_rate": 0.8667,
+        "keys": 258
+      },
+      "redis2": {
+        "hits": 889,
+        "misses": 289,
+        "sets": 288,
+        "errors": 0,
+        "hit_rate": 0.7547,
+        "keys": 287
+      },
+      "redis3": {
+        "hits": 1456,
+        "misses": 278,
+        "sets": 278,
+        "errors": 0,
+        "hit_rate": 0.8397,
+        "keys": 278
+      }
+    }
+  },
+  "writes": {
+    "searches_fired": 20000,
+    "distinct_queries": 200,
+    "logical_writes_delta": 20000,
+    "physical_writes_delta": 1822,
+    "write_reduction_pct": 90.89,
+    "server_reported": {
+      "logical_writes": 20001,
+      "physical_writes": 1823,
+      "pending_in_buffer": 0,
+      "flushes": 11,
+      "write_reduction": 0.9089,
+      "write_reduction_pct": 90.89,
+      "avg_rows_per_flush": 165.7,
+      "recency_invalidations": 1967
+    }
+  },
+  "ring_balance": {
+    "keys_routed": 120000,
+    "vnodes_per_node": 600,
+    "per_node": {
+      "redis1": 38860,
+      "redis2": 40664,
+      "redis3": 40476
+    },
+    "per_node_pct": {
+      "redis1": 32.38,
+      "redis2": 33.89,
+      "redis3": 33.73
+    },
+    "max_min_spread_pct": 4.51
+  },
+  "smoke": {
+    "GET /health": 200,
+    "GET /suggest?q=iphone": 200,
+    "GET /suggest recency": 200,
+    "GET /suggest empty": 200,
+    "GET /suggest no-match": 200,
+    "POST /search": 200,
+    "GET /trending": 200,
+    "GET /cache/debug": 200,
+    "GET /stats/writes": 200,
+    "GET /metrics": 200,
+    "GET / (frontend)": 200
+  }
+}

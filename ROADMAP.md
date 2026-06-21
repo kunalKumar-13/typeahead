@@ -18,7 +18,7 @@ resumable from any session.
 - [x] **Phase 5** — Per-query exponentially-decayed recent-activity counter blended with historical count; `mode=recency` and `GET /trending`. Decay prevents permanent over-ranking; invalidate affected Redis keys when ranking shifts.
 - [x] **Phase 6** — `GET /metrics` (p95 latency, hit rate, write reduction, per-node stats). Static frontend served by FastAPI: search box, debounced dropdown w/ keyboard nav, basic/enhanced toggle, trending panel, dummy-response display, loading/empty/error states, visible "matched node · HIT/MISS" indicator.
 - [x] **Phase 7** — `docker-compose.yml` with FastAPI app + 3 Redis instances; `docker compose up` brings the whole system up; dataset generation runs as a setup step. README documents the one-command run.
-- [ ] **Phase 8** — Benchmark script producing real numbers (suggest p95, cache hit rate, write reduction, ring balance across the 3 Redis nodes). Run, capture, smoke-test every endpoint.
+- [x] **Phase 8** — Benchmark script producing real numbers (suggest p95, cache hit rate, write reduction, ring balance across the 3 Redis nodes). Run, capture, smoke-test every endpoint.
 - [ ] **Phase 9** — `docs/REPORT.md` + `REPORT.pdf`: architecture + diagram, dataset + loading, API docs, design choices & trade-offs, performance report — using real Python/Redis numbers.
 
 ## Layout
