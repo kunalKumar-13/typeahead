@@ -69,10 +69,24 @@ export function bootstrap() {
       (recovered ? ` (recovered ${recovered} searches from WAL)` : '')
   );
 
-  // Demonstrate consistent-hashing balance in the startup logs.
-  const samplePrefixes = rows.slice(0, 2000).map((r) => r.query.slice(0, 3));
-  const dist = cache.ringDistribution(samplePrefixes.map((p) => `recency|${p}`));
-  console.log('Consistent-hash key distribution (2k sample prefixes):', dist);
+  // Demonstrate consistent-hashing balance over a large set of DISTINCT keys
+  // (evenly sampled across the dataset). With virtual nodes this should be
+  // close to even — the honest test of ring balance.
+  const distinctSample = [];
+  const step = Math.max(1, Math.floor(rows.length / 12000));
+  for (let i = 0; i < rows.length; i += step) {
+    distinctSample.push(`recency|${rows[i].query}`);
+  }
+  const dist = cache.ringDistribution(distinctSample);
+  const ideal = distinctSample.length / cache.nodeSnapshots().length;
+  const spread = Object.values(dist).map(
+    (v) => `${((v / ideal - 1) * 100).toFixed(1)}%`
+  );
+  console.log(
+    `Consistent-hash balance over ${distinctSample.length} distinct keys:`,
+    dist,
+    `(deviation from even: ${spread.join(', ')})`
+  );
 
   return { trie, trending, cache, batchWriter, suggestions };
 }
@@ -122,9 +136,13 @@ export function createApp(ctx) {
     const route = ctx.cache.route(key);
     const presence = ctx.cache.peek(key);
 
-    // Small live demo of balance across nodes for a sample of prefixes.
+    // Live demo of balance across nodes over many DISTINCT keys (all 2-char
+    // [a-z][a-z] prefixes = 676 keys) so the spread reflects the ring, not a
+    // skewed sample.
     const sample = [];
-    for (let c = 97; c <= 122; c++) sample.push(`${mode}|${String.fromCharCode(c)}`);
+    for (let a = 97; a <= 122; a++)
+      for (let b = 97; b <= 122; b++)
+        sample.push(`${mode}|${String.fromCharCode(a)}${String.fromCharCode(b)}`);
     const distribution = ctx.cache.ringDistribution(sample);
 
     res.json({

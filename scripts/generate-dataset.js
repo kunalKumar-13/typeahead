@@ -37,6 +37,10 @@ const brands = [
   'oppo', 'vivo', 'realme', 'motorola', 'nokia', 'huawei', 'logitech', 'razer',
   'corsair', 'intel', 'amd', 'nvidia', 'tesla', 'toyota', 'honda', 'ford', 'bmw',
   'audi', 'mercedes', 'ikea', 'philips', 'panasonic', 'whirlpool', 'dyson',
+  'boat', 'noise', 'fossil', 'casio', 'titan', 'uniqlo', 'wrangler', 'crocs',
+  'skechers', 'new balance', 'under armour', 'fitbit', 'garmin', 'anker',
+  'sandisk', 'seagate', 'kingston', 'msi', 'gigabyte', 'tcl', 'haier', 'godrej',
+  'bosch', 'kitchenaid', 'lego', 'redmi', 'poco', 'asics', 'hitachi', 'epson',
 ];
 const products = [
   'iphone', 'galaxy', 'macbook', 'laptop', 'phone', 'tablet', 'headphones',
@@ -46,6 +50,11 @@ const products = [
   'power bank', 'shoes', 'sneakers', 'running shoes', 'jacket', 'jeans', 'tshirt',
   'backpack', 'sunglasses', 'wallet', 'perfume', 'blender', 'air fryer',
   'microwave', 'refrigerator', 'washing machine', 'vacuum cleaner', 'coffee maker',
+  'gaming chair', 'office chair', 'standing desk', 'printer', 'projector',
+  'tripod', 'microphone', 'graphics card', 'motherboard', 'processor', 'ram',
+  'cpu cooler', 'led bulb', 'smart bulb', 'doorbell', 'security camera',
+  'thermostat', 'kettle', 'toaster', 'iron', 'hair dryer', 'trimmer', 'shaver',
+  'toothbrush', 'water bottle', 'yoga mat', 'dumbbells', 'treadmill', 'drone',
 ];
 const techTopics = [
   'java', 'python', 'javascript', 'typescript', 'react', 'node', 'spring boot',
