@@ -11,7 +11,7 @@ resumable from any session.
 ## Phases
 
 - [x] **Step 0** — Safety + setup: tag `node-complete`, remove Node impl, write this roadmap.
-- [ ] **Phase 1** — FastAPI skeleton; generate/derive a ≥120k query+count dataset into SQLite; build an in-memory trie (prefix → entries) at startup.
+- [x] **Phase 1** — FastAPI skeleton; generate/derive a ≥120k query+count dataset into SQLite; build an in-memory trie (prefix → entries) at startup.
 - [ ] **Phase 2** — `GET /suggest?q=<prefix>&mode=count`: trie → top-10 by all-time count, prefix-matched, case-insensitive, graceful on empty/missing/no-match.
 - [ ] **Phase 3** — `POST /search` → `{"message":"Searched"}`; append-only WAL buffer; batch writer aggregates repeats in memory and flushes to SQLite on size/interval in one transaction; expose write-reduction stats.
 - [ ] **Phase 4** — Three Redis instances (compose); app-layer consistent-hash ring with virtual nodes maps a prefix key → one node. `/suggest` checks routed node (HIT) else computes + stores with TTL (MISS). `GET /cache/debug?prefix=` shows routed node, ring position, vnode, HIT/MISS.
