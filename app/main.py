@@ -10,12 +10,15 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import Body, FastAPI, Query
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.batch_writer import BatchWriter
 from app.config import config
 from app.db import Database
+from app.metrics import Metrics
 from app.redis_cache import DistributedCache
-from app.suggestions import SuggestionService
+from app.suggestions import SuggestionService, normalize
 from app.trending import TrendingTracker
 from app.trie import Trie
 
@@ -30,6 +33,7 @@ class AppContext:
         self.batch: BatchWriter | None = None
         self.cache: DistributedCache | None = None
         self.trending: TrendingTracker | None = None
+        self.metrics: Metrics = Metrics()
         self.started_at: float = 0.0
 
 
@@ -96,8 +100,7 @@ def suggest(
     The prefix routes (consistent hash) to one Redis node; that node is checked
     first (HIT) else we compute from the trie and store with a TTL (MISS).
     """
-    from app.suggestions import normalize
-
+    t0 = time.perf_counter()
     norm = normalize(q)
     key = DistributedCache.key_for(norm, mode)
     routed = ctx.cache.ring.route(key) if norm else None
@@ -111,11 +114,14 @@ def suggest(
         if norm and results:
             ctx.cache.set(key, results)
 
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+    ctx.metrics.record_suggest(elapsed_ms)
     return {
         "query": q,
         "mode": mode,
         "count": len(results),
         "suggestions": results,
+        "latency_ms": round(elapsed_ms, 3),
         "cache": {"status": status, "node": routed, "key": key if norm else None},
     }
 
@@ -151,8 +157,6 @@ def cache_debug(
     mode: str = Query("count", description="ranking mode: count | recency"),
 ):
     """Show how a prefix routes on the ring and whether it's currently cached."""
-    from app.suggestions import normalize
-
     norm = normalize(prefix)
     key = DistributedCache.key_for(norm, mode)
     info = ctx.cache.debug(key)
@@ -163,9 +167,35 @@ def cache_debug(
     return info
 
 
-@app.get("/")
-def root():
+@app.get("/metrics")
+def metrics():
+    """Unified operational metrics: latency percentiles, cache hit rate,
+    per-node stats, and write reduction."""
+    return {
+        "latency": ctx.metrics.latency(),
+        "cache": ctx.cache.stats(),
+        "writes": ctx.batch.stats(),
+        "redis_up": ctx.cache.ping(),
+        "uptime_s": round(time.time() - ctx.started_at, 1),
+    }
+
+
+@app.get("/api")
+def api_index():
     return {
         "service": "search-typeahead",
         "endpoints": ["/health", "/suggest", "/search", "/trending", "/cache/debug", "/metrics"],
     }
+
+
+# ---- static frontend (served by FastAPI) ----
+if config.paths.static.exists():
+    app.mount("/static", StaticFiles(directory=str(config.paths.static)), name="static")
+
+
+@app.get("/")
+def index():
+    idx = config.paths.static / "index.html"
+    if idx.exists():
+        return FileResponse(str(idx))
+    return {"service": "search-typeahead", "frontend": "not built"}

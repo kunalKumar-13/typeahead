@@ -1,0 +1,116 @@
+:root {
+  --bg: #0f1117;
+  --card: #181b24;
+  --card-2: #1f2330;
+  --line: #2a2f3d;
+  --text: #e7e9ee;
+  --muted: #8b91a3;
+  --accent: #6ea8fe;
+  --hit: #2ecc71;
+  --miss: #e0a106;
+  --hot: #ff6b6b;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: radial-gradient(1200px 600px at 50% -10%, #1a2030 0%, var(--bg) 55%);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.app { max-width: 760px; margin: 0 auto; padding: 40px 20px 80px; }
+.hero { text-align: center; margin-bottom: 28px; }
+.hero h1 { font-size: 32px; margin: 0 0 6px; letter-spacing: -0.5px; }
+.hero .sub { color: var(--muted); margin: 0; font-size: 14px; }
+
+.search-card, .trending-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.mode-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.mode-label { color: var(--muted); font-size: 13px; }
+.toggle { display: inline-flex; background: var(--card-2); border-radius: 999px; padding: 3px; }
+.toggle-btn {
+  border: 0; background: transparent; color: var(--muted);
+  padding: 7px 14px; border-radius: 999px; cursor: pointer; font-size: 13px;
+  transition: all .15s ease;
+}
+.toggle-btn.active { background: var(--accent); color: #0b1020; font-weight: 600; }
+
+.search-box { position: relative; }
+#search {
+  width: 100%; padding: 14px 110px 14px 16px;
+  background: var(--card-2); border: 1px solid var(--line); border-radius: 10px;
+  color: var(--text); font-size: 16px; outline: none;
+}
+#search:focus { border-color: var(--accent); }
+
+.status-badge {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  font-size: 12px; color: var(--muted);
+}
+
+.dropdown {
+  list-style: none; margin: 8px 0 0; padding: 6px;
+  background: var(--card-2); border: 1px solid var(--line); border-radius: 10px;
+  position: absolute; width: 100%; z-index: 5; max-height: 360px; overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+}
+.dropdown li {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 14px;
+}
+.dropdown li.active, .dropdown li:hover { background: #2b3142; }
+.dropdown li .q { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dropdown li .meta { color: var(--muted); font-size: 12px; margin-left: 12px; flex: none; }
+.dropdown li .hot { color: var(--hot); }
+.dropdown li.empty { color: var(--muted); cursor: default; justify-content: center; }
+
+.cache-indicator {
+  margin-top: 14px; font-size: 13px; color: var(--muted);
+  display: flex; align-items: center; gap: 8px;
+}
+.cache-indicator strong { color: var(--text); }
+.pill {
+  padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+}
+.pill.hit { background: rgba(46,204,113,.15); color: var(--hit); }
+.pill.miss { background: rgba(224,161,6,.15); color: var(--miss); }
+.latency { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.search-result {
+  margin-top: 14px; padding: 12px 14px; border-radius: 10px;
+  background: rgba(110,168,254,.08); border: 1px solid rgba(110,168,254,.25);
+  font-size: 13px; color: var(--text);
+}
+.search-result code { color: var(--accent); }
+.search-result.error { background: rgba(255,107,107,.1); border-color: rgba(255,107,107,.35); }
+
+.trending-head { display: flex; align-items: center; justify-content: space-between; }
+.trending-head h2 { font-size: 16px; margin: 0; }
+.ghost-btn { background: var(--card-2); border: 1px solid var(--line); color: var(--muted);
+  border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 15px; }
+.ghost-btn:hover { color: var(--text); }
+.trending-list { margin: 14px 0 8px; padding-left: 22px; }
+.trending-list li { padding: 6px 0; font-size: 14px; }
+.trending-list li .q { cursor: pointer; }
+.trending-list li .q:hover { color: var(--accent); }
+.trending-list li .score { color: var(--muted); font-size: 12px; margin-left: 8px; }
+.hint { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
+.muted { color: var(--muted); }
+
+.foot { text-align: center; font-size: 12px; color: var(--muted); padding-bottom: 24px; }
+
+.spinner {
+  display: inline-block; width: 12px; height: 12px; border: 2px solid var(--line);
+  border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

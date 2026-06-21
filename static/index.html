@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Search Typeahead</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <h1>Search Typeahead</h1>
+      <p class="sub">FastAPI · in-memory trie · 3-node Redis cache (consistent hashing) · batched writes</p>
+    </header>
+
+    <section class="search-card">
+      <div class="mode-row">
+        <span class="mode-label">Ranking</span>
+        <div class="toggle" id="modeToggle" role="tablist" aria-label="ranking mode">
+          <button class="toggle-btn active" data-mode="count" role="tab" aria-selected="true">Basic · all-time count</button>
+          <button class="toggle-btn" data-mode="recency" role="tab" aria-selected="false">Enhanced · trending</button>
+        </div>
+      </div>
+
+      <div class="search-box">
+        <input id="search" type="text" autocomplete="off" spellcheck="false"
+               placeholder="Try: iphone, python, paris…" aria-label="search query" />
+        <div id="status" class="status-badge" aria-live="polite"></div>
+        <ul id="dropdown" class="dropdown" role="listbox" hidden></ul>
+      </div>
+
+      <div id="cacheIndicator" class="cache-indicator" hidden>
+        matched node: <strong id="nodeName">—</strong>
+        <span id="hitmiss" class="pill">—</span>
+        <span id="latency" class="latency">—</span>
+      </div>
+
+      <div id="searchResult" class="search-result" hidden></div>
+    </section>
+
+    <section class="trending-card">
+      <div class="trending-head">
+        <h2>Trending now</h2>
+        <button id="refreshTrending" class="ghost-btn" title="refresh">↻</button>
+      </div>
+      <ol id="trending" class="trending-list"><li class="muted">loading…</li></ol>
+      <p class="hint">Recency = exponentially-decayed recent searches blended with all-time count.</p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span id="health" class="muted">connecting…</span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
