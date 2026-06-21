@@ -12,6 +12,7 @@ data/*.db-shm
 data/*.db-wal
 data/*.wal
 data/*.log
+data/redis/
 
 # Misc
 .DS_Store

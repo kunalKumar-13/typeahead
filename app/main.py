@@ -14,6 +14,7 @@ from fastapi import Body, FastAPI, Query
 from app.batch_writer import BatchWriter
 from app.config import config
 from app.db import Database
+from app.redis_cache import DistributedCache
 from app.suggestions import SuggestionService
 from app.trie import Trie
 
@@ -26,6 +27,7 @@ class AppContext:
         self.trie: Trie | None = None
         self.suggestions: SuggestionService | None = None
         self.batch: BatchWriter | None = None
+        self.cache: DistributedCache | None = None
         self.started_at: float = 0.0
 
 
@@ -53,7 +55,11 @@ async def lifespan(app: FastAPI):
     ctx.suggestions = SuggestionService(ctx.trie)
     ctx.batch = BatchWriter(ctx.db, ctx.trie)
     ctx.batch.start()
+    ctx.cache = DistributedCache()
+    pings = ctx.cache.ping()
+    up = sum(1 for v in pings.values() if v)
     print(f"[startup] loaded {len(ctx.trie):,} queries; trie built in {build_ms:.0f}ms")
+    print(f"[startup] redis nodes up: {up}/{len(pings)} {pings}")
     try:
         yield
     finally:
@@ -80,13 +86,32 @@ def suggest(
     q: str = Query("", description="prefix to complete"),
     mode: str = Query("count", description="ranking mode: count | recency"),
 ):
-    """Top-10 prefix completions. Case-insensitive; graceful on empty/no-match."""
-    results = ctx.suggestions.suggest(q, mode=mode)
+    """Top-10 prefix completions, served through the distributed Redis cache.
+
+    The prefix routes (consistent hash) to one Redis node; that node is checked
+    first (HIT) else we compute from the trie and store with a TTL (MISS).
+    """
+    from app.suggestions import normalize
+
+    norm = normalize(q)
+    key = DistributedCache.key_for(norm, mode)
+    routed = ctx.cache.ring.route(key) if norm else None
+
+    cached = ctx.cache.get(key) if norm else None
+    if cached is not None:
+        status, results = "HIT", cached
+    else:
+        status = "MISS"
+        results = ctx.suggestions.suggest(q, mode=mode)
+        if norm and results:
+            ctx.cache.set(key, results)
+
     return {
         "query": q,
         "mode": mode,
         "count": len(results),
         "suggestions": results,
+        "cache": {"status": status, "node": routed, "key": key if norm else None},
     }
 
 
@@ -102,6 +127,24 @@ def search(payload: dict = Body(...)):
 def write_stats():
     """Write-reduction stats from the batch writer."""
     return ctx.batch.stats()
+
+
+@app.get("/cache/debug")
+def cache_debug(
+    prefix: str = Query("", description="prefix to route"),
+    mode: str = Query("count", description="ranking mode: count | recency"),
+):
+    """Show how a prefix routes on the ring and whether it's currently cached."""
+    from app.suggestions import normalize
+
+    norm = normalize(prefix)
+    key = DistributedCache.key_for(norm, mode)
+    info = ctx.cache.debug(key)
+    # Is the value live on the routed node right now? (non-counting peek)
+    present = ctx.cache.exists(key) if norm else False
+    info["status"] = "HIT" if present else "MISS"
+    info["normalized_prefix"] = norm
+    return info
 
 
 @app.get("/")
