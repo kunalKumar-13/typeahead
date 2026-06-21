@@ -35,8 +35,8 @@ app/            FastAPI application package
   redis_cache.py  distributed cache over 3 Redis nodes
   trending.py     exponentially-decayed recency tracker
   metrics.py      latency / hit-rate / write-reduction counters
-scripts/        generate_dataset.py, load_dataset.py, benchmark.py
+scripts/        fetch_dataset.py, load_dataset.py, benchmark.py
 static/         frontend (index.html, app.js, styles.css)
-data/           generated CSV + SQLite (gitignored)
+data/           dump cache + CSV + SQLite (gitignored)
 docs/           REPORT.md + REPORT.pdf
 ```

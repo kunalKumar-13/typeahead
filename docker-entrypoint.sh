@@ -7,8 +7,8 @@ set -e
 mkdir -p data
 
 if [ ! -f data/typeahead.db ]; then
-  echo "[setup] no SQLite store found — generating dataset (>=120k queries)…"
-  python scripts/generate_dataset.py
+  echo "[setup] no SQLite store found — fetching real dataset (Wikimedia pageviews)…"
+  python scripts/fetch_dataset.py
   echo "[setup] loading dataset into SQLite…"
   python scripts/load_dataset.py
 else

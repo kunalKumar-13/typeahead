@@ -1,7 +1,8 @@
 # Search Typeahead
 
 A distributed search-typeahead system: **FastAPI** API + frontend, an in-memory
-**trie** for prefix completions over a **≥120k** query dataset stored in
+**trie** for prefix completions over a **120k**-row real-world query dataset
+(Wikipedia page titles + pageview counts) stored in
 **SQLite**, a **3-node Redis** distributed cache addressed by an app-layer
 **consistent-hash ring** with virtual nodes, **batched writes** with a
 write-ahead log, and **recency-aware trending** via an exponentially-decayed
@@ -18,8 +19,8 @@ docker compose up --build
 ```
 
 This brings up the FastAPI app plus three Redis instances. On first boot the app
-**generates and loads the ≥120k dataset** as a setup step (subsequent boots reuse
-the persisted SQLite volume). Then open:
+**downloads + aggregates the real dataset (Wikimedia pageviews) and loads it** as
+a setup step (subsequent boots reuse the persisted SQLite volume). Then open:
 
 - **http://localhost:8000** — the frontend (search box, trending, node/HIT-MISS indicator)
 - **http://localhost:8000/docs** — interactive API docs (Swagger)
@@ -42,8 +43,8 @@ pip install -r requirements.txt
 # 3 local Redis instances on :6390 :6391 :6392
 sh scripts/run_local_redis.sh start
 
-# generate + load the dataset (once)
-python scripts/generate_dataset.py
+# fetch the real dataset (Wikimedia pageviews) + load it (once)
+python scripts/fetch_dataset.py
 python scripts/load_dataset.py
 
 # start the API + frontend
@@ -93,7 +94,7 @@ python scripts/benchmark.py        # suggest p95, hit rate, write reduction, rin
 ```
 app/      FastAPI app (main, config, db, trie, suggestions, batch_writer,
           consistent_hash, redis_cache, trending, metrics)
-scripts/  generate_dataset.py, load_dataset.py, benchmark.py, run_local_redis.sh
+scripts/  fetch_dataset.py, load_dataset.py, benchmark.py, run_local_redis.sh
 static/   frontend (index.html, app.js, styles.css)
 docs/     REPORT.md + REPORT.pdf
 ```
