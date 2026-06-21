@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from app.config import config
 
 
-@dataclass
+@dataclass(eq=False)  # identity equality/hash: entries are unique mutable objects
 class Entry:
     query: str
     count: int

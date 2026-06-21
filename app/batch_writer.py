@@ -155,4 +155,5 @@ class BatchWriter:
             "write_reduction": round(reduction, 4),
             "write_reduction_pct": round(reduction * 100, 2),
             "avg_rows_per_flush": round(physical / self.flushes, 1) if self.flushes else 0,
+            "recency_invalidations": self.recency_invalidations,
         }

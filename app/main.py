@@ -16,6 +16,7 @@ from app.config import config
 from app.db import Database
 from app.redis_cache import DistributedCache
 from app.suggestions import SuggestionService
+from app.trending import TrendingTracker
 from app.trie import Trie
 
 
@@ -28,6 +29,7 @@ class AppContext:
         self.suggestions: SuggestionService | None = None
         self.batch: BatchWriter | None = None
         self.cache: DistributedCache | None = None
+        self.trending: TrendingTracker | None = None
         self.started_at: float = 0.0
 
 
@@ -52,10 +54,13 @@ async def lifespan(app: FastAPI):
     t0 = time.time()
     ctx.trie = Trie.build(ctx.db.iter_all())
     build_ms = (time.time() - t0) * 1000
-    ctx.suggestions = SuggestionService(ctx.trie)
-    ctx.batch = BatchWriter(ctx.db, ctx.trie)
-    ctx.batch.start()
+    # cache -> trending -> suggestions -> batch (trending invalidates cache;
+    # suggestions and the batch writer both consult the trending tracker)
     ctx.cache = DistributedCache()
+    ctx.trending = TrendingTracker(cache=ctx.cache)
+    ctx.suggestions = SuggestionService(ctx.trie, trending=ctx.trending)
+    ctx.batch = BatchWriter(ctx.db, ctx.trie, trending=ctx.trending)
+    ctx.batch.start()
     pings = ctx.cache.ping()
     up = sum(1 for v in pings.values() if v)
     print(f"[startup] loaded {len(ctx.trie):,} queries; trie built in {build_ms:.0f}ms")
@@ -113,6 +118,17 @@ def suggest(
         "suggestions": results,
         "cache": {"status": status, "node": routed, "key": key if norm else None},
     }
+
+
+@app.get("/trending")
+def trending(limit: int = Query(10, ge=1, le=50)):
+    """Top queries by exponentially-decayed recent activity (short-TTL cached)."""
+    cached = ctx.cache.get("trending:global")
+    if cached is not None:
+        return {"trending": cached[:limit], "cache": {"status": "HIT", "key": "trending:global"}}
+    items = ctx.trending.trending(limit=max(limit, config.trending_limit))
+    ctx.cache.set("trending:global", items, ttl_s=config.trending_ttl_s)
+    return {"trending": items[:limit], "cache": {"status": "MISS", "key": "trending:global"}}
 
 
 @app.post("/search")
