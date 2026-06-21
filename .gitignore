@@ -1,0 +1,14 @@
+node_modules/
+
+# Generated dataset + database artifacts (regenerate with `npm run setup`)
+data/*.csv
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.wal
+data/*.log
+
+# Misc
+.DS_Store
+*.local
+npm-debug.log*

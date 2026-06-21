@@ -1,0 +1,21 @@
+{
+  "name": "search-typeahead",
+  "version": "1.0.0",
+  "description": "Search Typeahead System: distributed cache (consistent hashing), trie-based suggestions, recency-aware trending, and batched writes. HLD assignment.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "generate": "node scripts/generate-dataset.js",
+    "load": "node scripts/load-dataset.js",
+    "setup": "node scripts/generate-dataset.js && node scripts/load-dataset.js",
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "bench": "node scripts/benchmark.js",
+    "seed-traffic": "node scripts/seed-traffic.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
