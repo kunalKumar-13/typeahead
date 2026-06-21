@@ -1,0 +1,58 @@
+# One-command bring-up of the whole system:
+#   docker compose up --build
+#
+# Services:
+#   redis1/2/3 — three independent Redis instances (the distributed cache; the
+#                app sharded across them with an app-layer consistent-hash ring)
+#   app        — FastAPI typeahead; generates+loads the dataset on first boot,
+#                then serves the API + frontend on http://localhost:8000
+services:
+  redis1:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  redis2:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  redis3:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Address the three Redis containers by service name on the compose network.
+      REDIS_NODES: "redis1:6379,redis2:6379,redis3:6379"
+      DATASET_SIZE: "120000"
+    volumes:
+      # Persist the generated SQLite store + WAL across restarts so the dataset
+      # is generated only once.
+      - typeahead-data:/app/data
+    depends_on:
+      redis1:
+        condition: service_healthy
+      redis2:
+        condition: service_healthy
+      redis3:
+        condition: service_healthy
+
+volumes:
+  typeahead-data:
