@@ -44,15 +44,17 @@ export class SuggestionService {
     if (prefix.trim() === '') {
       metrics.suggestLatency.record(performance.now() - t0);
       metrics.api.suggest++;
-      return { prefix, mode, source: 'empty', suggestions: [] };
+      return { prefix, mode, source: 'empty', node: null, suggestions: [] };
     }
 
     const key = this.cacheKey(prefix, mode);
+    // Consistent-hash routing decision for this prefix key (surfaced to the UI).
+    const node = this.cache.ownerNode(key);
     const cached = this.cache.get(key);
     if (cached !== undefined) {
       metrics.suggestLatency.record(performance.now() - t0);
       metrics.api.suggest++;
-      return { prefix, mode, source: 'cache', suggestions: cached };
+      return { prefix, mode, source: 'cache', node, suggestions: cached };
     }
 
     // ---- Cache miss: build from the primary in-memory index ----
@@ -90,7 +92,7 @@ export class SuggestionService {
     this.cache.set(key, suggestions);
     metrics.suggestLatency.record(performance.now() - t0);
     metrics.api.suggest++;
-    return { prefix, mode, source: 'store', suggestions };
+    return { prefix, mode, source: 'store', node, suggestions };
   }
 
   // Currently-trending queries (short-TTL cached, since they change often).

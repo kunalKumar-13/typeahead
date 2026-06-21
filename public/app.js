@@ -1,34 +1,43 @@
 // Frontend for the Search Typeahead system. Vanilla JS, no build step.
 //
-// Highlights:
 //  - debounced /suggest calls (avoids a backend hit per keystroke)
-//  - AbortController cancels in-flight requests so stale responses can't
-//    overwrite fresher ones (out-of-order protection)
-//  - full keyboard navigation (Up/Down/Enter/Escape)
-//  - live ranking-mode toggle to show basic (count) vs enhanced (recency)
-//  - trending panel, loading + error states, backend health indicator
+//  - AbortController cancels in-flight requests so a stale response can't
+//    overwrite a fresher one (out-of-order protection)
+//  - full keyboard navigation (Up / Down / Enter / Escape) with a clearly
+//    highlighted active row
+//  - segmented Enhanced/Basic ranking toggle (recency vs all-time count)
+//  - a demo-facing "matched node · HIT/MISS" pill fed by the consistent-hash
+//    routing decision returned from /suggest
+//  - delayed loading state + empty + error states; trending panel; health dot
 
-const $ = (sel) => document.querySelector(sel);
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
 
 const input = $('#search-input');
 const box = $('.search-box');
 const list = $('#suggestions');
 const clearBtn = $('#clear-btn');
 const searchBtn = $('#search-btn');
-const latencyBadge = $('#latency-badge');
 const responseCard = $('#response-card');
 const responseBody = $('#response-body');
 const trendingList = $('#trending-list');
 const errorToast = $('#error-toast');
 
-const DEBOUNCE_MS = 120;
-let activeIndex = -1; // highlighted suggestion for keyboard nav
-let currentSuggestions = [];
-let reqSeq = 0; // monotonically increasing; guards against stale renders
-let inflight = null; // AbortController for the latest /suggest
+// route pill elements
+const routePill = $('#route-pill');
+const routeNode = $('#route-node');
+const routeStatus = $('#route-status');
+const routeLatency = $('#route-latency');
 
-const getMode = () =>
-  document.querySelector('input[name="mode"]:checked').value;
+const DEBOUNCE_MS = 110;
+const LOADING_DELAY_MS = 120;
+
+let mode = 'recency';
+let activeIndex = -1;
+let currentSuggestions = [];
+let reqSeq = 0;
+let inflight = null;
+let loadingTimer = null;
 
 // --------------------------------------------------------------------------
 // Networking
@@ -37,7 +46,14 @@ async function fetchSuggestions(prefix) {
   const seq = ++reqSeq;
   if (inflight) inflight.abort();
   inflight = new AbortController();
-  const mode = getMode();
+
+  // Delayed loading state — only shows if the response is slow, so it never
+  // flickers on the usual sub-millisecond responses.
+  clearTimeout(loadingTimer);
+  loadingTimer = setTimeout(() => {
+    if (seq === reqSeq) showLoading();
+  }, LOADING_DELAY_MS);
+
   const t0 = performance.now();
   try {
     const res = await fetch(
@@ -46,17 +62,16 @@ async function fetchSuggestions(prefix) {
     );
     if (!res.ok) throw new Error(`suggest ${res.status}`);
     const data = await res.json();
-    const ms = (performance.now() - t0).toFixed(1);
-    // Ignore if a newer request has since been issued.
-    if (seq !== reqSeq) return;
-    latencyBadge.textContent = `${data.source} · ${ms} ms`;
-    latencyBadge.className =
-      'latency-badge ' + (data.source === 'cache' ? 'tag-cache' : 'tag-store');
+    const ms = performance.now() - t0;
+    if (seq !== reqSeq) return; // a newer request superseded this one
+    clearTimeout(loadingTimer);
+    updateRoutePill(data, ms);
     renderSuggestions(data.suggestions, prefix, data.source, ms);
   } catch (err) {
-    if (err.name === 'AbortError') return; // superseded — not an error
+    if (err.name === 'AbortError') return;
+    clearTimeout(loadingTimer);
+    showSuggestError();
     showError('Could not fetch suggestions');
-    closeDropdown();
   }
 }
 
@@ -73,9 +88,8 @@ async function submitSearch(rawQuery) {
     if (!res.ok) throw new Error(`search ${res.status}`);
     const data = await res.json();
     showResponse(data);
-    // Reflect the new activity: refresh trending and re-query suggestions.
-    loadTrending();
-  } catch (err) {
+    loadTrending(); // reflect the new activity
+  } catch {
     showError('Search request failed');
   }
 }
@@ -83,7 +97,7 @@ async function submitSearch(rawQuery) {
 async function loadTrending() {
   try {
     const res = await fetch('/trending');
-    if (!res.ok) throw new Error('trending');
+    if (!res.ok) throw new Error();
     const data = await res.json();
     renderTrending(data.trending);
   } catch {
@@ -109,28 +123,42 @@ async function checkHealth() {
 // Rendering
 // --------------------------------------------------------------------------
 function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, (c) => ({
+  return String(s).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   })[c]);
 }
 
 function highlightPrefix(query, prefix) {
-  const safe = escapeHtml(query);
   if (prefix && query.toLowerCase().startsWith(prefix.toLowerCase())) {
     return `<b>${escapeHtml(query.slice(0, prefix.length))}</b>${escapeHtml(
       query.slice(prefix.length)
     )}`;
   }
-  return safe;
+  return escapeHtml(query);
+}
+
+function formatCount(n) {
+  if (n == null) return '0';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
+  return String(n);
+}
+
+function showLoading() {
+  list.innerHTML = `<li class="suggest-loading"><span class="spinner"></span>Searching…</li>`;
+  openDropdown();
+}
+
+function showSuggestError() {
+  list.innerHTML = `<li class="suggest-error">⚠ Couldn’t load suggestions</li>`;
+  openDropdown();
 }
 
 function renderSuggestions(suggestions, prefix, source, ms) {
   currentSuggestions = suggestions || [];
   activeIndex = -1;
   if (!currentSuggestions.length) {
-    list.innerHTML = `<li class="suggest-empty">No matches for “${escapeHtml(
-      prefix
-    )}”</li>`;
+    list.innerHTML = `<li class="suggest-empty">🔍 No matches for “${escapeHtml(prefix)}”</li>`;
     openDropdown();
     return;
   }
@@ -138,24 +166,23 @@ function renderSuggestions(suggestions, prefix, source, ms) {
     .map((s, i) => {
       const hot =
         s.recentScore && s.recentScore > 0.05
-          ? `<span class="badge hot" title="recent activity score">🔥 ${s.recentScore.toFixed(
-              1
-            )}</span>`
+          ? `<span class="badge hot" title="recent activity score">🔥 ${s.recentScore.toFixed(1)}</span>`
           : '';
-      return `<li class="suggestion" role="option" data-index="${i}" data-query="${escapeHtml(
-        s.query
-      )}">
+      return `<li class="suggestion" role="option" data-index="${i}" data-query="${escapeHtml(s.query)}">
         <span class="q">${highlightPrefix(s.query, prefix)}</span>
-        <span class="meta">${hot}<span class="badge" title="all-time count">${formatCount(
-        s.count
-      )}</span></span>
+        <span class="meta">
+          ${hot}
+          <span class="badge" title="all-time search count">${formatCount(s.count)}</span>
+          <span class="enter-hint">↵</span>
+        </span>
       </li>`;
     })
     .join('');
-  const tag = source === 'cache' ? 'tag-cache' : 'tag-store';
+  const tag = source === 'cache' ? 'tag-hit' : 'tag-miss';
+  const label = source === 'cache' ? 'cache HIT' : 'store MISS';
   list.innerHTML =
     rows +
-    `<li class="source-line"><span>served from <span class="${tag}">${source}</span></span><span>${ms} ms</span></li>`;
+    `<li class="source-line"><span class="${tag}">${label}</span><span>${ms.toFixed(1)} ms · ${currentSuggestions.length} results</span></li>`;
   openDropdown();
 }
 
@@ -168,27 +195,34 @@ function renderTrending(items) {
   trendingList.innerHTML = items
     .map(
       (t) => `<li data-query="${escapeHtml(t.query)}">
-        <div class="t-row">
-          <span class="t-query">${escapeHtml(t.query)}</span>
-          <span class="t-score">🔥 ${t.recentScore.toFixed(2)} · ${formatCount(
-        t.count
-      )} all-time</span>
-        </div>
+        <span class="t-query">${escapeHtml(t.query)}</span>
+        <span class="t-meta">
+          <span class="badge hot" title="recency score">🔥 ${t.recentScore.toFixed(2)}</span>
+          <span class="badge" title="all-time count">${formatCount(t.count)}</span>
+        </span>
       </li>`
     )
     .join('');
 }
 
+function updateRoutePill(data, ms) {
+  if (!data || data.source === 'empty' || !data.node) {
+    routePill.className = 'route-pill idle';
+    routeNode.textContent = 'no query yet';
+    routeStatus.textContent = '';
+    routeLatency.textContent = '';
+    return;
+  }
+  const hit = data.source === 'cache';
+  routePill.className = 'route-pill ' + (hit ? 'hit' : 'miss');
+  routeNode.textContent = data.node;        // e.g. cache-node-1
+  routeStatus.textContent = hit ? 'HIT' : 'MISS';
+  routeLatency.textContent = `· ${ms.toFixed(1)} ms`;
+}
+
 function showResponse(data) {
   responseBody.textContent = JSON.stringify(data, null, 2);
   responseCard.hidden = false;
-}
-
-function formatCount(n) {
-  if (n == null) return '0';
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
-  return String(n);
 }
 
 let errorTimer = null;
@@ -200,7 +234,7 @@ function showError(msg) {
 }
 
 // --------------------------------------------------------------------------
-// Dropdown + keyboard nav
+// Dropdown + keyboard navigation
 // --------------------------------------------------------------------------
 function openDropdown() {
   list.hidden = false;
@@ -216,8 +250,9 @@ function setActive(i) {
   if (!items.length) return;
   activeIndex = (i + items.length) % items.length;
   items.forEach((el, idx) => {
-    el.classList.toggle('active', idx === activeIndex);
-    if (idx === activeIndex) el.scrollIntoView({ block: 'nearest' });
+    const on = idx === activeIndex;
+    el.classList.toggle('active', on);
+    if (on) el.scrollIntoView({ block: 'nearest' });
   });
 }
 
@@ -226,27 +261,26 @@ function setActive(i) {
 // --------------------------------------------------------------------------
 const debounce = (fn, ms) => {
   let t;
-  return (...args) => {
+  return (...a) => {
     clearTimeout(t);
-    t = setTimeout(() => fn(...args), ms);
+    t = setTimeout(() => fn(...a), ms);
   };
 };
-
-const debouncedSuggest = debounce((val) => fetchSuggestions(val), DEBOUNCE_MS);
+const debouncedSuggest = debounce((v) => fetchSuggestions(v), DEBOUNCE_MS);
 
 input.addEventListener('input', () => {
   const val = input.value;
   clearBtn.classList.toggle('show', val.length > 0);
   if (val.trim() === '') {
     closeDropdown();
-    latencyBadge.textContent = '';
+    updateRoutePill(null);
     return;
   }
   debouncedSuggest(val);
 });
 
 input.addEventListener('keydown', (e) => {
-  const open = !list.hidden;
+  const open = !list.hidden && list.querySelector('.suggestion');
   switch (e.key) {
     case 'ArrowDown':
       e.preventDefault();
@@ -269,10 +303,17 @@ input.addEventListener('keydown', (e) => {
   }
 });
 
-// Re-query when the ranking mode changes, so the user sees the difference live.
-document.querySelectorAll('input[name="mode"]').forEach((r) =>
-  r.addEventListener('change', () => {
-    if (input.value.trim()) fetchSuggestions(input.value);
+// Segmented ranking toggle
+$$('.seg').forEach((btn) =>
+  btn.addEventListener('click', () => {
+    if (btn.dataset.mode === mode) return;
+    mode = btn.dataset.mode;
+    $$('.seg').forEach((b) => {
+      const on = b === btn;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', String(on));
+    });
+    if (input.value.trim()) fetchSuggestions(input.value); // show the difference live
   })
 );
 
@@ -296,14 +337,13 @@ clearBtn.addEventListener('click', () => {
   input.value = '';
   clearBtn.classList.remove('show');
   closeDropdown();
-  latencyBadge.textContent = '';
+  updateRoutePill(null);
   input.focus();
 });
 
 $('#response-close').addEventListener('click', () => (responseCard.hidden = true));
 $('#trending-refresh').addEventListener('click', loadTrending);
 
-// Close dropdown when clicking outside.
 document.addEventListener('click', (e) => {
   if (!box.contains(e.target)) closeDropdown();
 });
@@ -313,5 +353,5 @@ document.addEventListener('click', (e) => {
 // --------------------------------------------------------------------------
 checkHealth();
 loadTrending();
-setInterval(loadTrending, 10_000); // keep trending fresh
+setInterval(loadTrending, 10_000);
 input.focus();

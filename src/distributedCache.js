@@ -64,6 +64,12 @@ export class DistributedCache {
     for (let i = 1; i <= upto; i++) this.invalidate(query.slice(0, i));
   }
 
+  // ---- Introspection ----
+  // Which logical node owns this key (the consistent-hash routing decision).
+  ownerNode(key) {
+    return this.ring.getNode(key);
+  }
+
   // ---- Introspection for /cache/debug ----
   route(key) {
     return this.ring.getNodeDetailed(key);

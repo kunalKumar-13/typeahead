@@ -15,21 +15,28 @@
       <header class="hero">
         <h1>🔎 Search Typeahead</h1>
         <p class="subtitle">
-          Trie-backed suggestions · distributed cache (consistent hashing) ·
+          Trie suggestions · distributed cache (consistent hashing) ·
           recency-aware trending · batched writes
         </p>
       </header>
 
       <section class="search-card">
         <div class="search-row">
-          <div class="search-box" role="combobox" aria-expanded="false" aria-haspopup="listbox">
+          <div
+            class="search-box"
+            role="combobox"
+            aria-expanded="false"
+            aria-haspopup="listbox"
+            aria-owns="suggestions"
+          >
             <span class="search-icon" aria-hidden="true">🔍</span>
             <input
               id="search-input"
               type="text"
               autocomplete="off"
+              autocapitalize="off"
               spellcheck="false"
-              placeholder="Start typing… e.g. ip, java, how to, samsung"
+              placeholder="Start typing…  e.g. ip · java · how to · samsung"
               aria-label="Search"
               aria-autocomplete="list"
               aria-controls="suggestions"
@@ -40,24 +47,35 @@
           <button id="search-btn" class="search-btn">Search</button>
         </div>
 
-        <div class="controls">
-          <span class="control-label">Ranking:</span>
-          <label class="radio">
-            <input type="radio" name="mode" value="recency" checked />
-            <span>Recency-aware <small>(enhanced)</small></span>
-          </label>
-          <label class="radio">
-            <input type="radio" name="mode" value="count" />
-            <span>All-time count <small>(basic)</small></span>
-          </label>
-          <span id="latency-badge" class="latency-badge" title="Last /suggest round-trip"></span>
+        <div class="meta-row">
+          <div
+            class="segmented"
+            role="tablist"
+            aria-label="Ranking mode"
+            title="Switch ranking strategy"
+          >
+            <button class="seg active" data-mode="recency" role="tab" aria-selected="true">
+              Enhanced <span class="seg-sub">recency</span>
+            </button>
+            <button class="seg" data-mode="count" role="tab" aria-selected="false">
+              Basic <span class="seg-sub">count</span>
+            </button>
+          </div>
+
+          <!-- The demo-facing routing indicator -->
+          <div id="route-pill" class="route-pill idle" title="Consistent-hash routing + cache result for the current prefix">
+            <span class="route-dot"></span>
+            <span id="route-node" class="route-node">no query yet</span>
+            <span id="route-status" class="route-status"></span>
+            <span id="route-latency" class="route-latency"></span>
+          </div>
         </div>
       </section>
 
       <section id="response-card" class="response-card" hidden>
         <div class="response-head">
-          <span class="response-title">Search API response</span>
-          <button id="response-close" class="response-close" aria-label="Dismiss">×</button>
+          <span class="response-title">✓ Search API response</span>
+          <button id="response-close" class="icon-btn" aria-label="Dismiss">×</button>
         </div>
         <pre id="response-body" class="response-body"></pre>
       </section>
@@ -65,20 +83,21 @@
       <section class="trending-card">
         <div class="trending-head">
           <h2>🔥 Trending now</h2>
-          <button id="trending-refresh" class="ghost-btn" title="Refresh">↻</button>
+          <button id="trending-refresh" class="icon-btn" title="Refresh trending">↻</button>
         </div>
         <ol id="trending-list" class="trending-list">
           <li class="muted">Loading…</li>
         </ol>
         <p class="hint">
-          Submit the same query a few times to watch it climb the trending list —
-          recent activity is weighted, then decays.
+          Submit a query a few times to watch it climb — recent activity is
+          weighted, then decays, so short-lived spikes don’t dominate forever.
         </p>
       </section>
 
       <footer class="foot">
         <span id="health-dot" class="dot" title="backend health"></span>
         <span id="health-text">checking backend…</span>
+        <span class="foot-spacer"></span>
         <a href="/metrics" target="_blank" rel="noopener">/metrics</a>
         <a href="/cache/debug?prefix=ip" target="_blank" rel="noopener">/cache/debug</a>
       </footer>
