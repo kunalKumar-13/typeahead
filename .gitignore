@@ -1,6 +1,11 @@
-node_modules/
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
 
-# Generated dataset + database artifacts (regenerate with `npm run setup`)
+# Generated dataset + SQLite artifacts (regenerate with scripts/generate_dataset.py + load_dataset.py)
 data/*.csv
 data/*.db
 data/*.db-shm
@@ -11,4 +16,3 @@ data/*.log
 # Misc
 .DS_Store
 *.local
-npm-debug.log*
