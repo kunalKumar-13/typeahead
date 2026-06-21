@@ -1,18 +1,15 @@
-// Frontend for the search typeahead.
-// - debounced /suggest with keyboard navigation
-// - basic (count) / enhanced (recency) ranking toggle
-// - visible "matched node · HIT/MISS" indicator + latency
-// - trending panel, dummy /search response display, loading/empty/error states
+// Typeahead frontend — visual refactor only. Same endpoints, same behavior:
+//   GET /suggest?q=&mode=count|recency   debounced, keyboard-navigable
+//   POST /search                          on select / Enter (dummy response shown)
+//   GET /trending, GET /health
+// One semantic accent (green = cache HIT); all data rendered monospace.
 
 const $ = (id) => document.getElementById(id);
 const input = $("search");
 const dropdown = $("dropdown");
-const statusBadge = $("status");
-const cacheIndicator = $("cacheIndicator");
-const nodeName = $("nodeName");
-const hitmiss = $("hitmiss");
-const latencyEl = $("latency");
-const searchResult = $("searchResult");
+const fieldHint = $("fieldHint");
+const telemetry = $("telemetry");
+const result = $("searchResult");
 
 let mode = "count";
 let items = [];
@@ -20,19 +17,19 @@ let active = -1;
 let debounceTimer = null;
 let inflight = 0;
 
-// ---------- ranking mode toggle ----------
-document.querySelectorAll(".toggle-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".toggle-btn").forEach((b) => {
-      b.classList.remove("active");
-      b.setAttribute("aria-selected", "false");
-    });
-    btn.classList.add("active");
-    btn.setAttribute("aria-selected", "true");
-    mode = btn.dataset.mode;
-    if (input.value.trim()) fetchSuggestions(input.value);
-  });
+// ---------- ranking mode (Popular = count, Trending = recency) ----------
+document.querySelectorAll(".seg").forEach((btn) => {
+  btn.addEventListener("click", () => setMode(btn.dataset.mode));
 });
+function setMode(next) {
+  mode = next;
+  document.querySelectorAll(".seg").forEach((b) => {
+    const on = b.dataset.mode === mode;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  if (input.value.trim()) fetchSuggestions(input.value);
+}
 
 // ---------- debounced suggest ----------
 input.addEventListener("input", () => {
@@ -40,10 +37,12 @@ input.addEventListener("input", () => {
   const q = input.value;
   if (!q.trim()) {
     closeDropdown();
-    cacheIndicator.hidden = true;
+    fieldHint.textContent = "";
+    setTelemetryIdle();
     return;
   }
-  statusBadge.innerHTML = '<span class="spinner"></span>';
+  fieldHint.textContent = "searching";
+  telemetry.classList.add("searching");
   debounceTimer = setTimeout(() => fetchSuggestions(q), 120);
 });
 
@@ -53,25 +52,28 @@ async function fetchSuggestions(q) {
     const res = await fetch(`/suggest?q=${encodeURIComponent(q)}&mode=${mode}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    if (seq !== inflight) return; // a newer request superseded this one
-    statusBadge.textContent = "";
+    if (seq !== inflight) return; // superseded by a newer keystroke
+    fieldHint.textContent = "";
+    telemetry.classList.remove("searching");
     items = data.suggestions || [];
     active = -1;
     renderDropdown();
-    renderCacheIndicator(data);
+    renderTelemetry(data);
   } catch (err) {
     if (seq !== inflight) return;
-    statusBadge.textContent = "";
+    fieldHint.textContent = "";
+    telemetry.classList.remove("searching");
     renderError(err);
   }
 }
 
+// ---------- dropdown ----------
 function renderDropdown() {
   dropdown.innerHTML = "";
   if (!items.length) {
     const li = document.createElement("li");
-    li.className = "empty";
-    li.textContent = "no matches";
+    li.className = "note";
+    li.textContent = "No matches";
     dropdown.appendChild(li);
     dropdown.hidden = false;
     return;
@@ -79,36 +81,40 @@ function renderDropdown() {
   items.forEach((it, i) => {
     const li = document.createElement("li");
     li.setAttribute("role", "option");
-    const hot = mode === "recency" && it.recent && it.recent > 1
-      ? ` <span class="hot">🔥${Math.round(it.recent)}</span>` : "";
-    li.innerHTML = `<span class="q">${escapeHtml(it.query)}</span>` +
-      `<span class="meta">${formatCount(it.count)}${hot}</span>`;
-    li.addEventListener("mouseenter", () => { active = i; highlight(); });
+    const fire = mode === "recency" && it.recent && it.recent > 1
+      ? `<span class="fire">↗ ${Math.round(it.recent).toLocaleString()}</span>` : "";
+    li.innerHTML =
+      `<span class="q">${escapeHtml(it.query)}</span>` +
+      `<span class="c">${formatCount(it.count)}${fire}</span>`;
+    li.addEventListener("mousemove", () => { if (active !== i) { active = i; highlight(); } });
     li.addEventListener("click", () => choose(i));
     dropdown.appendChild(li);
   });
   dropdown.hidden = false;
 }
 
-function renderCacheIndicator(data) {
+// ---------- telemetry: "redis2 · Hit · 0.21 ms" ----------
+function renderTelemetry(data) {
   const c = data.cache || {};
-  cacheIndicator.hidden = false;
-  nodeName.textContent = c.node || "—";
-  hitmiss.textContent = c.status || "—";
-  hitmiss.className = "pill " + (c.status === "HIT" ? "hit" : "miss");
-  latencyEl.textContent = data.latency_ms != null ? `${data.latency_ms.toFixed(2)} ms` : "";
+  const isHit = c.status === "HIT";
+  const node = c.node || "—";
+  const status = isHit ? "Hit" : "Miss";
+  const lat = data.latency_ms != null ? `${data.latency_ms.toFixed(2)} ms` : "—";
+  telemetry.innerHTML =
+    `<span class="node">${escapeHtml(node)}</span>` +
+    `<span class="sep">·</span>` +
+    `<span class="${isHit ? "hit" : "miss"}">${status}</span>` +
+    `<span class="sep">·</span>` +
+    `<span class="lat">${lat}</span>`;
 }
-
+function setTelemetryIdle() {
+  telemetry.innerHTML =
+    `<span class="tel-muted">routed node · cache status · latency appear here</span>`;
+}
 function renderError(err) {
-  dropdown.innerHTML = "";
-  const li = document.createElement("li");
-  li.className = "empty";
-  li.textContent = "error fetching suggestions";
-  dropdown.appendChild(li);
-  dropdown.hidden = false;
-  searchResult.hidden = false;
-  searchResult.className = "search-result error";
-  searchResult.textContent = `⚠ ${err.message}`;
+  closeDropdownKeepError();
+  telemetry.innerHTML = `<span class="miss">request failed</span>` +
+    `<span class="sep">·</span><span class="lat">${escapeHtml(err.message)}</span>`;
 }
 
 // ---------- keyboard navigation ----------
@@ -132,17 +138,16 @@ function highlight() {
     dropdown.children[active].scrollIntoView({ block: "nearest" });
   }
 }
-
 function choose(i) {
   const q = items[i].query;
   input.value = q;
   closeDropdown();
   submitSearch(q);
 }
-
 function closeDropdown() { dropdown.hidden = true; active = -1; }
+function closeDropdownKeepError() { dropdown.hidden = true; active = -1; }
 
-// ---------- POST /search (dummy-response display) ----------
+// ---------- POST /search (dummy response) ----------
 async function submitSearch(q) {
   try {
     const res = await fetch("/search", {
@@ -151,58 +156,63 @@ async function submitSearch(q) {
       body: JSON.stringify({ query: q }),
     });
     const data = await res.json();
-    searchResult.hidden = false;
-    searchResult.className = "search-result";
-    searchResult.innerHTML = `searched <code>${escapeHtml(q)}</code> → server replied ` +
-      `<code>${escapeHtml(JSON.stringify(data))}</code>`;
+    result.hidden = false;
+    result.className = "result";
+    result.innerHTML =
+      `<span class="label">POST /search</span>` +
+      `recorded <code>${escapeHtml(q)}</code> — server replied <code>${escapeHtml(JSON.stringify(data))}</code>`;
     loadTrending();
   } catch (err) {
-    searchResult.hidden = false;
-    searchResult.className = "search-result error";
-    searchResult.textContent = `⚠ search failed: ${err.message}`;
+    result.hidden = false;
+    result.className = "result is-error";
+    result.innerHTML = `<span class="label">POST /search</span>failed — ${escapeHtml(err.message)}`;
   }
 }
 
-// ---------- trending panel ----------
+// ---------- trending ----------
 async function loadTrending() {
   const el = $("trending");
   try {
     const res = await fetch("/trending?limit=10");
     const data = await res.json();
     const t = data.trending || [];
-    if (!t.length) { el.innerHTML = '<li class="muted">no trending activity yet — run a few searches</li>'; return; }
+    if (!t.length) {
+      el.innerHTML = `<li class="trend-empty">No activity yet — run a few searches.</li>`;
+      return;
+    }
     el.innerHTML = "";
-    t.forEach((it) => {
+    t.forEach((it, i) => {
       const li = document.createElement("li");
-      li.innerHTML = `<span class="q">${escapeHtml(it.query)}</span>` +
-        `<span class="score">🔥 ${Math.round(it.recent)} · ${formatCount(it.count)} all-time</span>`;
-      li.querySelector(".q").addEventListener("click", () => {
-        input.value = it.query; mode = "recency"; syncToggle(); fetchSuggestions(it.query);
+      li.innerHTML =
+        `<span class="rank">${String(i + 1).padStart(2, "0")}</span>` +
+        `<span class="tq">${escapeHtml(it.query)}</span>` +
+        `<span class="tmeta">` +
+          `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">` +
+            `<path d="M4 18 L11 11 L15 15 L21 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` +
+            `<path d="M15 7h6v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>` +
+          `</svg>` +
+          `${Math.round(it.recent).toLocaleString()}` +
+        `</span>`;
+      li.querySelector(".tq").addEventListener("click", () => {
+        input.value = it.query;
+        setMode("recency");
       });
       el.appendChild(li);
     });
   } catch (err) {
-    el.innerHTML = `<li class="muted">trending unavailable: ${escapeHtml(err.message)}</li>`;
+    el.innerHTML = `<li class="trend-empty">Trending unavailable — ${escapeHtml(err.message)}</li>`;
   }
 }
 
-function syncToggle() {
-  document.querySelectorAll(".toggle-btn").forEach((b) => {
-    const on = b.dataset.mode === mode;
-    b.classList.toggle("active", on);
-    b.setAttribute("aria-selected", on ? "true" : "false");
-  });
-}
-
-$("refreshTrending").addEventListener("click", loadTrending);
-
-// ---------- health footer ----------
+// ---------- health (top bar) ----------
 async function loadHealth() {
   try {
     const res = await fetch("/health");
     const d = await res.json();
-    $("health").textContent = `● ${d.queries_loaded.toLocaleString()} queries loaded · up ${d.uptime_s}s`;
-  } catch { $("health").textContent = "● backend unreachable"; }
+    $("health").textContent = `${d.queries_loaded.toLocaleString()} queries · ${d.uptime_s}s up`;
+  } catch {
+    $("health").textContent = "backend unreachable";
+  }
 }
 
 // ---------- helpers ----------
@@ -211,14 +221,13 @@ function escapeHtml(s) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 function formatCount(n) {
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + "k";
-  return String(n);
+  return Number(n).toLocaleString("en-US"); // thousands separators, e.g. 29,429
 }
 
 document.addEventListener("click", (e) => {
-  if (!e.target.closest(".search-box")) closeDropdown();
+  if (!e.target.closest(".search-stack")) closeDropdown();
 });
 
+setTelemetryIdle();
 loadHealth();
 loadTrending();

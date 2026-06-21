@@ -12,6 +12,11 @@ activity counter.
 > The previous Node.js implementation is preserved in git history at tag
 > `node-complete`; this tree is a clean Python project.
 
+![Typeahead UI](docs/ui.png)
+
+The UI shows the routed Redis node, cache HIT/MISS, and latency live under the
+search field (e.g. `redis3 · Hit · 0.44 ms`).
+
 ## Run it (one command, Docker)
 
 ```bash

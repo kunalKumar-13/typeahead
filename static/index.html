@@ -3,54 +3,72 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Search Typeahead</title>
+  <title>Typeahead</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <main class="app">
-    <header class="hero">
-      <h1>Search Typeahead</h1>
-      <p class="sub">FastAPI · in-memory trie · 3-node Redis cache (consistent hashing) · batched writes</p>
-    </header>
+  <header class="topbar">
+    <div class="wordmark">
+      <span class="mark" aria-hidden="true">⌗</span>
+      <span class="name">Typeahead</span>
+      <span class="div" aria-hidden="true"></span>
+      <span class="tag">prefix search · distributed cache</span>
+    </div>
+    <div class="topbar-status" id="health">—</div>
+  </header>
 
-    <section class="search-card">
-      <div class="mode-row">
-        <span class="mode-label">Ranking</span>
-        <div class="toggle" id="modeToggle" role="tablist" aria-label="ranking mode">
-          <button class="toggle-btn active" data-mode="count" role="tab" aria-selected="true">Basic · all-time count</button>
-          <button class="toggle-btn" data-mode="recency" role="tab" aria-selected="false">Enhanced · trending</button>
+  <main class="stage">
+    <!-- primary: search -->
+    <section class="panel panel-search">
+      <div class="control-row">
+        <label class="eyebrow" for="search">Search</label>
+        <div class="segmented" id="modeToggle" role="tablist" aria-label="ranking mode">
+          <button class="seg active" data-mode="count" role="tab" aria-selected="true">Popular</button>
+          <button class="seg" data-mode="recency" role="tab" aria-selected="false">Trending</button>
         </div>
       </div>
 
-      <div class="search-box">
-        <input id="search" type="text" autocomplete="off" spellcheck="false"
-               placeholder="Try: iphone, python, paris…" aria-label="search query" />
-        <div id="status" class="status-badge" aria-live="polite"></div>
+      <div class="search-stack">
+        <div class="field-wrap">
+          <svg class="field-glyph" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
+            <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          <input id="search" type="text" autocomplete="off" autocapitalize="off"
+                 spellcheck="false" placeholder="Search 120,000 titles…" aria-label="search query" />
+          <span id="fieldHint" class="field-hint" aria-live="polite"></span>
+        </div>
+
+        <div id="telemetry" class="telemetry" aria-live="polite">
+          <span class="tel-muted">routed node · cache status · latency appear here</span>
+        </div>
+
         <ul id="dropdown" class="dropdown" role="listbox" hidden></ul>
-      </div>
 
-      <div id="cacheIndicator" class="cache-indicator" hidden>
-        matched node: <strong id="nodeName">—</strong>
-        <span id="hitmiss" class="pill">—</span>
-        <span id="latency" class="latency">—</span>
+        <div id="searchResult" class="result" hidden></div>
       </div>
-
-      <div id="searchResult" class="search-result" hidden></div>
     </section>
 
-    <section class="trending-card">
-      <div class="trending-head">
-        <h2>Trending now</h2>
-        <button id="refreshTrending" class="ghost-btn" title="refresh">↻</button>
+    <!-- secondary: trending -->
+    <aside class="panel panel-trending">
+      <div class="panel-head">
+        <h2 class="panel-title">Trending now</h2>
+        <button id="refreshTrending" class="icon-btn" title="Refresh" aria-label="refresh trending">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M20 11A8 8 0 1 0 18 16.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            <path d="M20 5v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
       </div>
-      <ol id="trending" class="trending-list"><li class="muted">loading…</li></ol>
-      <p class="hint">Recency = exponentially-decayed recent searches blended with all-time count.</p>
-    </section>
+      <ol id="trending" class="trend-list">
+        <li class="trend-empty">No activity yet — run a few searches.</li>
+      </ol>
+      <p class="panel-foot">Recent searches, exponentially decayed and blended with all-time views.</p>
+    </aside>
   </main>
-
-  <footer class="foot">
-    <span id="health" class="muted">connecting…</span>
-  </footer>
 
   <script src="/static/app.js"></script>
 </body>
