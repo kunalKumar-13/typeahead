@@ -9,8 +9,9 @@ from __future__ import annotations
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Query
+from fastapi import Body, FastAPI, Query
 
+from app.batch_writer import BatchWriter
 from app.config import config
 from app.db import Database
 from app.suggestions import SuggestionService
@@ -24,6 +25,7 @@ class AppContext:
         self.db: Database | None = None
         self.trie: Trie | None = None
         self.suggestions: SuggestionService | None = None
+        self.batch: BatchWriter | None = None
         self.started_at: float = 0.0
 
 
@@ -40,14 +42,23 @@ async def lifespan(app: FastAPI):
             "SQLite store is empty. Run scripts/generate_dataset.py then "
             "scripts/load_dataset.py before starting the app."
         )
+    # Crash recovery: replay any un-flushed WAL into SQLite before the trie is
+    # built so the in-memory view starts consistent with durable storage.
+    recovered = BatchWriter.recover(ctx.db)
+    if recovered:
+        print(f"[startup] recovered {recovered:,} searches from WAL")
     t0 = time.time()
     ctx.trie = Trie.build(ctx.db.iter_all())
     build_ms = (time.time() - t0) * 1000
     ctx.suggestions = SuggestionService(ctx.trie)
+    ctx.batch = BatchWriter(ctx.db, ctx.trie)
+    ctx.batch.start()
     print(f"[startup] loaded {len(ctx.trie):,} queries; trie built in {build_ms:.0f}ms")
     try:
         yield
     finally:
+        if ctx.batch:
+            ctx.batch.stop()
         if ctx.db:
             ctx.db.close()
 
@@ -77,6 +88,20 @@ def suggest(
         "count": len(results),
         "suggestions": results,
     }
+
+
+@app.post("/search")
+def search(payload: dict = Body(...)):
+    """Record a search. Aggregated in memory + WAL, batch-flushed to SQLite."""
+    query = (payload or {}).get("query", "")
+    ctx.batch.record(query)
+    return {"message": "Searched"}
+
+
+@app.get("/stats/writes")
+def write_stats():
+    """Write-reduction stats from the batch writer."""
+    return ctx.batch.stats()
 
 
 @app.get("/")
